@@ -1,0 +1,5 @@
+# macOS
+.DS_Store
+
+# Reel generation working dir (large video sources + rendered output)
+reels_work/
