@@ -1,0 +1,24 @@
+# Curated TikTok search terms — copy to reels_work/brolls/sources.txt and edit.
+# One term per line. Lines starting with # are ignored.
+# Goal: HD, motion-rich, NO on-screen text. Longer clips = more hooks per download.
+# (The fetcher also auto-drops captioned clips via OCR, and cover-crops any aspect into the panel.)
+
+fpv drone
+cinematic fpv
+drone view
+aerial nature
+pov gopro
+downhill mtb pov
+enduro mtb pov
+ski pov powder
+snowboard pov
+surfing pov
+pov walk city night
+canyon road drive pov
+parkour pov
+freerun pov
+timelapse clouds
+ocean waves
+waterfall slow motion
+
+# Avoid: talking-head / storytime / capcut template / meme / compilation accounts (text-heavy).

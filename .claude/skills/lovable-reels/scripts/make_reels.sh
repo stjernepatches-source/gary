@@ -3,6 +3,9 @@
 # make_reels.sh — Lag split-screen reels: topp-klipp + reaksjonsopptak (øverst/nederst)
 # etterfulgt av et fast slutt-klipp (Lovable/CTA).
 #
+# DEPRECATED (gammel geometri 1008/912, tre klipp). Gjeldende arbeidsflyt: bruk
+# render_reels.sh (core + hook, 910/1010, auto-nummerering) og fetch_brolls.py. Se SKILL.md.
+#
 # Output: 1080x1920, 60fps, ~21 Mbps, SDR (bt709), AAC 160k. Reaksjonslyd er AV.
 #
 # Bruk:

@@ -61,3 +61,37 @@ gir en grov diskplass-advarsel før kjøring.
 - SDR: bt709 colorspace/primaries/trc
 - AAC 160k, 44.1 kHz
 - `+faststart` for rask avspilling/opplasting
+
+---
+
+## Gjeldende pipeline (bruk denne) — `scripts/render_reels.sh`
+
+`make_reels.sh` over er den **gamle** geometrien (topp 1008 / reaksjon 912, tre separate klipp).
+Den nåværende arbeidsflyten bruker ett **core-klipp** (Gary-talehode + caption som topp i de
+første 14 s, deretter fullskjerm app-demo "reveal") + et **hook-klipp** (B-roll) nederst:
+
+```
+render_reels.sh --core core_new4.mp4 --hook KLIPP.mp4 --count auto --outdir output
+```
+
+- Topp = core beskåret til 910 px; bunn = 14 s hook-utsnitt beskåret til 1010 px (cover-crop —
+  fungerer for både liggende og stående kilder). Etter 14 s: core fullskjerm.
+- Hook-lyd droppes; lyd = core. Output-nummerering fortsetter `N.mp4` (auto = høyeste + 1).
+- Et langt hook-klipp deles i flere 14 s reels.
+
+## Auto-hente HD B-roll hooks — `scripts/fetch_brolls.py`
+
+Når brukeren går tom for egne klipp: hent **HD, tekstfri** B-roll fra **TikTok** (gratis, uten
+vannmerke, via tikwm.com — 720–1080p; ingen API-nøkkel/innlogging). Klipp med innbrent tekst
+droppes automatisk (OCR via RapidOCR). Se `docs/BROLL_FETCH.md` og `sources.example.txt`.
+
+```
+python3 scripts/fetch_brolls.py --tiktok-search "fpv drone" --tiktok-search "downhill mtb pov" \
+    --n 12 --max-clips 6 --render --core core_new4.mp4 --render-outdir output
+```
+
+- Lyd droppes (core-lyd brukes), så klippets musikk havner aldri i output — men *bildet* er fortsatt
+  andres innhold: foretrekk natur/action (fpv, drone, mtb, ski), ikke ansikter.
+- Dedupe via `brolls/seen_tiktok.txt`; manifest i `brolls/manifest.jsonl`; diskvakt + ≥720p-filter innebygd.
+- Fallback: `--source youtube` (kun 360p — siste utvei hvis tikwm er nede).
+- Forutsetninger installert: `requests`, `yt-dlp`, `rapidocr-onnxruntime`.
