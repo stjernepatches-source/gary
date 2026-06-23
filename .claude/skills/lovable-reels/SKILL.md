@@ -81,9 +81,11 @@ render_reels.sh --core core_new4.mp4 --hook KLIPP.mp4 --count auto --outdir outp
 
 ## Auto-hente HD B-roll hooks — `scripts/fetch_brolls.py`
 
-Når brukeren går tom for egne klipp: hent **HD, tekstfri** B-roll fra **TikTok** (gratis, uten
-vannmerke, via tikwm.com — 720–1080p; ingen API-nøkkel/innlogging). Klipp med innbrent tekst
-droppes automatisk (OCR via RapidOCR). Se `docs/BROLL_FETCH.md` og `sources.example.txt`.
+Når brukeren går tom for egne klipp: hent **HD, tekstfri, relevant** B-roll fra **TikTok** (gratis,
+uten vannmerke, via tikwm.com — 720–1080p; ingen API-nøkkel/innlogging). Automatiske kvalitetsfiltre:
+innbrent tekst droppes (OCR/RapidOCR), og produkt-showcase / unboxing / talking-head / statiske klipp
+droppes (CLIP-relevans via fastembed) — bare rå, immersiv POV/action/natur slipper gjennom. Pluss
+≥720p- og lysstyrke-filter. Se `docs/BROLL_FETCH.md` og `sources.example.txt`.
 
 ```
 python3 scripts/fetch_brolls.py --tiktok-search "fpv drone" --tiktok-search "downhill mtb pov" \
@@ -94,4 +96,5 @@ python3 scripts/fetch_brolls.py --tiktok-search "fpv drone" --tiktok-search "dow
   andres innhold: foretrekk natur/action (fpv, drone, mtb, ski), ikke ansikter.
 - Dedupe via `brolls/seen_tiktok.txt`; manifest i `brolls/manifest.jsonl`; diskvakt + ≥720p-filter innebygd.
 - Fallback: `--source youtube` (kun 360p — siste utvei hvis tikwm er nede).
-- Forutsetninger installert: `requests`, `yt-dlp`, `rapidocr-onnxruntime`.
+- Skru av filtre ved behov: `--no-ocr`, `--no-relevance`.
+- Forutsetninger installert: `requests`, `yt-dlp`, `rapidocr-onnxruntime`, `fastembed`.

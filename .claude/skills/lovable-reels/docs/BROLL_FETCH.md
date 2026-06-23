@@ -4,15 +4,21 @@ Pulls **HD, no-text** B-roll clips from **TikTok** (free, no watermark) and rend
 reels, so you don't have to record every hook yourself.
 
 ## One-time setup
-Already installed: `requests`, `yt-dlp`, and `rapidocr-onnxruntime` (the no-text filter).
-If you ever need them again: `python3 -m pip install -U requests yt-dlp rapidocr-onnxruntime`.
+Already installed: `requests`, `yt-dlp`, `rapidocr-onnxruntime` (no-text OCR), `fastembed` (relevance/CLIP).
+If you ever need them again: `python3 -m pip install -U requests yt-dlp rapidocr-onnxruntime fastembed`.
 **No API key, no login, no account.** Source = the free `tikwm.com` TikTok API.
 
 > **Quality:** TikTok clips come down at **720–1080p** (no watermark) — sharp, unlike YouTube's 360p.
 > The clip's audio is dropped from the reel, so its music never triggers copyright. The **visual** is
 > still someone's content, so prefer scenery/action (fpv, drone, mtb, ski, scenery), not faces.
->
-> **No-text filter is automatic:** clips with burned-in captions are detected (OCR) and skipped.
+
+### Automatic quality gates (every clip is checked before it's kept)
+1. **No-text (OCR):** clips with burned-in captions/CTAs are detected and dropped (samples early frames too, to catch intro titles).
+2. **Relevance (CLIP):** clips that are product showcases / unboxings / talking-head / static-object / goggles-indoors are dropped — only **raw immersive POV/action/scenery** passes.
+3. **Resolution:** anything under 720p on its smaller side is skipped.
+4. **Brightness:** near-black/unusable clips are skipped.
+
+Turn gates off if needed: `--no-ocr`, `--no-relevance`. No filter is perfect, so still glance at new clips before posting.
 
 ## Everyday use
 Run everything from the `reels_work/` folder.

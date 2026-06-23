@@ -79,17 +79,18 @@ def _get_ocr():
                   "pip install rapidocr-onnxruntime to enable)", file=sys.stderr)
     return _OCR
 
-def has_burned_text(path, dur, max_chars=12):
-    """True if sampled frames contain enough confident text to count as captioned."""
+def has_burned_text(path, dur, max_chars=8):
+    """True if sampled frames contain enough confident text to count as captioned.
+    Samples EARLY frames too (intro captions) at decent resolution."""
     ocr = _get_ocr()
     if not ocr:
         return False  # can't tell -> don't drop
     chars = 0
-    for frac in (0.12, 0.35, 0.55, 0.75, 0.92):
+    for frac in (0.02, 0.06, 0.12, 0.22, 0.35, 0.5, 0.65, 0.8, 0.92):
         t = max(0.0, (dur or 1) * frac)
         png = f"/tmp/_ocr_{os.getpid()}.png"
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t}", "-i", str(path),
-                        "-frames:v", "1", "-vf", "scale=540:-1", png], check=False)
+                        "-frames:v", "1", "-vf", "scale=720:-1", png], check=False)
         if not os.path.exists(png):
             continue
         try:
@@ -99,11 +100,97 @@ def has_burned_text(path, dur, max_chars=12):
         if res:
             for _box, text, conf in res:
                 t2 = (text or "").strip()
-                if conf and conf > 0.5 and len(t2) >= 3:
+                if conf and conf > 0.4 and len(t2) >= 3:
                     chars += len(t2)
         if chars > max_chars:
             return True
     return False
+
+# ---------------- relevance gate (CLIP zero-shot: raw immersive B-roll vs showcase/talking/static) ----------------
+# Catches what OCR can't: a sharp, text-free clip that's still a PRODUCT SHOWCASE / unboxing / talking
+# head / static object — not the raw immersive POV/action/scenery we want behind the GaryVee clip.
+_CLIP = None
+KEEP_PROMPTS = [
+    "first person POV action footage",
+    "fpv drone flying fast through a landscape",
+    "aerial drone footage flying over nature",
+    "point of view mountain biking or skiing down a trail",
+    "immersive scenery from a moving camera, ocean forest or city",
+    "surfing snowboarding or skateboarding action footage",
+]
+DROP_PROMPTS = [
+    "a person holding and showing a product to the camera",
+    "a drone or gadget sitting still, a product shot",
+    "a person talking to the camera, a vlogger or interview",
+    "an unboxing, product review or advertisement",
+    "a static shot of an object indoors",
+    "a screenshot, phone app interface, or text graphic",
+    "a person wearing FPV or VR goggles sitting indoors",
+    "a person sitting in a room holding a controller",
+    "a close-up of a person's face or selfie",
+]
+
+def _get_clip():
+    global _CLIP
+    if _CLIP is None:
+        try:
+            from fastembed import ImageEmbedding, TextEmbedding
+            import numpy as np
+            im = ImageEmbedding("Qdrant/clip-ViT-B-32-vision")
+            tm = TextEmbedding("Qdrant/clip-ViT-B-32-text")
+            te = np.array(list(tm.embed(KEEP_PROMPTS + DROP_PROMPTS)))
+            te = te / np.linalg.norm(te, axis=1, keepdims=True)
+            _CLIP = (im, te, len(KEEP_PROMPTS), np)
+        except Exception as e:
+            _CLIP = False
+            print(f"  (note: fastembed unavailable -> skipping relevance filter: {e}; "
+                  f"pip install fastembed to enable)", file=sys.stderr)
+    return _CLIP
+
+def _mean_luma(png):
+    """Mean brightness 0-255 of an image, or None if it can't be read."""
+    try:
+        from PIL import Image
+        import numpy as np
+        return float(np.asarray(Image.open(png).convert("L")).mean())
+    except Exception:
+        return None
+
+def is_immersive(path, dur, keep_frac=0.5, min_brightness=32):
+    """True if a majority of sampled frames read as raw immersive B-roll
+    (not showcase/talking/static) AND the clip isn't mostly dark/low-info."""
+    clip = _get_clip()
+    if not clip:
+        return True  # can't tell -> don't drop
+    im, te, nkeep, np = clip
+    frames, lumas = [], []
+    for frac in (0.1, 0.25, 0.4, 0.55, 0.7, 0.85):
+        t = max(0.0, (dur or 1) * frac)
+        png = f"/tmp/_rel_{os.getpid()}_{int(frac * 100)}.png"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t}", "-i", str(path),
+                        "-frames:v", "1", "-vf", "scale=336:-1", png], check=False)
+        if os.path.exists(png):
+            frames.append(png)
+            l = _mean_luma(png)
+            if l is not None: lumas.append(l)
+    if not frames:
+        return True
+    embs = np.nan_to_num(np.array(list(im.embed(frames)), dtype="float64"))  # kill inf/nan from degenerate frames
+    norms = np.linalg.norm(embs, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0                      # avoid div-by-zero on black frames
+    embs = embs / norms
+    sims = np.nan_to_num(embs @ te.T)            # [n_frames, n_prompts]
+    keep_votes = sum(1 for i, row in enumerate(sims)
+                     if norms[i, 0] > 1e-6 and float(row[:nkeep].max()) >= float(row[nkeep:].max()))
+    for f in frames:
+        try: os.remove(f)
+        except OSError: pass
+    # brightness floor: drop clips whose median sampled frame is too dark to be useful B-roll
+    if lumas:
+        lumas.sort()
+        if lumas[len(lumas) // 2] < min_brightness:
+            return False
+    return keep_votes / len(frames) >= keep_frac
 
 # ---------------- tikwm (TikTok) ----------------
 def tikwm_search(keywords, count):
@@ -180,6 +267,8 @@ def main():
     ap.add_argument("--seg", type=int, default=14, help="Hook slice length for n_hooks math.")
     ap.add_argument("--max-hooks-per-clip", type=int, default=6, help="Cap reels per long clip (default 6).")
     ap.add_argument("--no-ocr", action="store_true", help="Disable the no-text OCR filter.")
+    ap.add_argument("--no-relevance", action="store_true",
+                    help="Disable the CLIP relevance filter (immersive B-roll vs showcase/talking/static).")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--render", action="store_true")
     ap.add_argument("--core", default="./core_new4.mp4")
@@ -200,6 +289,10 @@ def main():
         kept = []
         for f in files:
             w, h, dur = ffprobe_dim_dur(f)
+            if not args.no_ocr and has_burned_text(f, dur):
+                print(f"  drop (burned-in text): {os.path.basename(f)}"); os.remove(f); continue
+            if not args.no_relevance and not is_immersive(f, dur):
+                print(f"  drop (not immersive — showcase/talking/static): {os.path.basename(f)}"); os.remove(f); continue
             kept.append((f, w, h, dur))
     else:
         kept = []
@@ -227,10 +320,12 @@ def main():
             spent_gb += dest.stat().st_size / 1e9
             w, h, realdur = ffprobe_dim_dur(dest)
             seen.add(vid)
-            if (h or 0) < args.min_height:
+            if min(w or 0, h or 0) < args.min_height:
                 print(f"  skip <{args.min_height}p ({w}x{h}): {dest.name}"); dest.unlink(missing_ok=True); continue
             if not args.no_ocr and has_burned_text(dest, realdur or dur):
                 print(f"  drop (burned-in text): {dest.name}"); dest.unlink(missing_ok=True); continue
+            if not args.no_relevance and not is_immersive(dest, realdur or dur):
+                print(f"  drop (not immersive — showcase/talking/static): {dest.name}"); dest.unlink(missing_ok=True); continue
             kept.append((str(dest), w, h, realdur or dur))
             print(f"  + {dest.name}  {w}x{h}  {round(realdur or dur,1)}s")
         seen_file.write_text(" ".join(sorted(seen)))
