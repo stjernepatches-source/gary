@@ -36,6 +36,9 @@ S = requests.Session(); S.headers.update({"User-Agent": UA})
 DEFAULT_QUERIES = [
     "fpv drone", "cinematic fpv", "drone view", "pov gopro", "downhill mtb pov",
     "ski pov", "snowboard pov", "pov walk city", "surfing pov", "aerial nature",
+    # food is part of the default mix (clean raw cooking b-roll, no text/talking):
+    "cooking asmr no talking", "raw cooking process cinematic", "street food closeup",
+    "chef plating fine dining", "satisfying food preparation closeup",
 ]
 
 # ---------------- helpers ----------------
@@ -117,6 +120,11 @@ KEEP_PROMPTS = [
     "point of view mountain biking or skiing down a trail",
     "immersive scenery from a moving camera, ocean forest or city",
     "surfing snowboarding or skateboarding action footage",
+    # food is part of the default mix:
+    "close up of hands cooking and preparing food",
+    "food being chopped fried or grilled in a kitchen",
+    "cinematic slow motion of sizzling food in a pan",
+    "chef plating a dish, fine dining food closeup",
 ]
 DROP_PROMPTS = [
     "a person holding and showing a product to the camera",
@@ -269,11 +277,19 @@ def main():
     ap.add_argument("--no-ocr", action="store_true", help="Disable the no-text OCR filter.")
     ap.add_argument("--no-relevance", action="store_true",
                     help="Disable the CLIP relevance filter (immersive B-roll vs showcase/talking/static).")
+    ap.add_argument("--keep-prompt", action="append", default=[],
+                    help="Replace the default KEEP relevance prompts (repeatable) to re-theme the filter, "
+                         "e.g. food: --keep-prompt 'close up of hands cooking food'. DROP prompts "
+                         "(talking-head/text/product) stay active, so 'no text / no talking' still holds.")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--render", action="store_true")
     ap.add_argument("--core", default="./core_new4.mp4")
     ap.add_argument("--render-outdir", default="./output")
     args = ap.parse_args()
+
+    if args.keep_prompt:                      # re-theme the relevance filter (e.g. food b-roll)
+        global KEEP_PROMPTS
+        KEEP_PROMPTS = args.keep_prompt
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     archive = out / "archive.txt"            # youtube (yt-dlp) dedupe

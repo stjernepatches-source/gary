@@ -79,6 +79,23 @@ render_reels.sh --core core_new4.mp4 --hook KLIPP.mp4 --count auto --outdir outp
 - Hook-lyd droppes; lyd = core. Output-nummerering fortsetter `N.mp4` (auto = høyeste + 1).
 - Et langt hook-klipp deles i flere 14 s reels.
 
+## Lime inn en reel-lenke → lag hooks — `scripts/make_from_link.sh`
+
+Når brukeren bare gir en **Instagram/TikTok/YouTube-lenke** (i stedet for å laste ned manuelt via
+fastvideosave.net e.l.): denne lager hele kjeden lenke → nedlasting → reels i ett steg.
+
+```
+scripts/make_from_link.sh --url "https://www.instagram.com/reel/XXXX/"
+```
+
+- Laster ned klippet med `yt-dlp` til `./hooks/`, og kaller deretter `render_reels.sh` med fila som `--hook`.
+- Alle ekstra flagg sendes rett videre til `render_reels.sh` (f.eks. `--core`, `--count`, `--seg`, `--dry-run`).
+- **Instagram krever ofte innlogging:** scriptet prøver først anonymt, og faller automatisk tilbake til
+  cookies fra installert nettleser (Chrome → Safari på denne maskinen). Tving én med `--cookies chrome`
+  (Chrome må være helt lukket for at macOS skal frigi cookie-DB-en). Bytt nettleser med samme flagg.
+- `--download-only` for bare å hente klippet uten å rendre.
+- Forutsetninger: `yt-dlp`, `ffmpeg`.
+
 ## Auto-hente HD B-roll hooks — `scripts/fetch_brolls.py`
 
 Når brukeren går tom for egne klipp: hent **HD, tekstfri, relevant** B-roll fra **TikTok** (gratis,
